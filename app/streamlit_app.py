@@ -228,13 +228,21 @@ def load_uploaded_data(uploaded_file):
 def load_models():
     """모델 로드 (기존 models 폴더에서)"""
     try:
+        # 모델 폴더가 존재하고 모델 파일이 있는지 먼저 확인
+        if not MODELS_DIR.exists():
+            return None
+
+        model_files = list(MODELS_DIR.glob('*.pkl'))
+        if not model_files:
+            return None
+
         from src.prediction import MultiTargetPredictor
         predictor = MultiTargetPredictor()
         if predictor.load_models():
             return predictor
         return None
     except Exception as e:
-        st.error(f"모델 로드 실패: {e}")
+        # Cloud 환경에서 오류 발생 시 조용히 처리
         return None
 
 
@@ -273,34 +281,42 @@ def load_combined_model(uploaded_file):
 
 def create_predictor_from_combined(combined_data):
     """통합 모델 데이터로 Predictor 생성"""
-    from src.prediction import MultiTargetPredictor
+    try:
+        from src.prediction import MultiTargetPredictor
 
-    predictor = MultiTargetPredictor()
-    predictor.models = combined_data.get('models', {})
-    predictor.model_performance = combined_data.get('performance', {})
-    predictor.feature_importance = combined_data.get('feature_importance', {})
-    predictor.is_loaded = len(predictor.models) > 0
+        predictor = MultiTargetPredictor()
+        predictor.models = combined_data.get('models', {})
+        predictor.model_performance = combined_data.get('performance', {})
+        predictor.feature_importance = combined_data.get('feature_importance', {})
+        predictor.is_loaded = len(predictor.models) > 0
 
-    return predictor if predictor.is_loaded else None
+        return predictor if predictor.is_loaded else None
+    except Exception as e:
+        st.error(f"Predictor 생성 실패: {e}")
+        return None
 
 
 def create_predictor_from_uploaded():
     """업로드된 모델들로 Predictor 생성"""
-    from src.prediction import MultiTargetPredictor
+    try:
+        from src.prediction import MultiTargetPredictor
 
-    predictor = MultiTargetPredictor()
-    predictor.models = {}
-    predictor.model_performance = {}
-    predictor.feature_importance = {}
+        predictor = MultiTargetPredictor()
+        predictor.models = {}
+        predictor.model_performance = {}
+        predictor.feature_importance = {}
 
-    for model_name, model_data in st.session_state.uploaded_models.items():
-        if model_data is not None:
-            predictor.models[model_name] = model_data.get('models', {})
-            predictor.model_performance[model_name] = model_data.get('performance', {})
-            predictor.feature_importance[model_name] = model_data.get('feature_importance', {})
+        for model_name, model_data in st.session_state.uploaded_models.items():
+            if model_data is not None:
+                predictor.models[model_name] = model_data.get('models', {})
+                predictor.model_performance[model_name] = model_data.get('performance', {})
+                predictor.feature_importance[model_name] = model_data.get('feature_importance', {})
 
-    predictor.is_loaded = len(predictor.models) > 0
-    return predictor if predictor.is_loaded else None
+        predictor.is_loaded = len(predictor.models) > 0
+        return predictor if predictor.is_loaded else None
+    except Exception as e:
+        st.error(f"Predictor 생성 실패: {e}")
+        return None
 
 
 def create_gauge_chart(value, title, min_val=0, max_val=100, threshold_good=70, threshold_bad=30):
