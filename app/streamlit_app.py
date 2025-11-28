@@ -340,7 +340,11 @@ def load_uploaded_model(uploaded_file, model_name):
 
 
 def load_combined_model(uploaded_file):
-    """통합 모델 파일 로드 (models_combined.pkl)"""
+    """통합 모델 파일 로드 (models_combined.pkl 또는 models_combined_with_data.pkl)
+
+    Returns:
+        tuple: (model_data, raw_data) - raw_data는 없으면 None
+    """
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pkl') as tmp_file:
             tmp_file.write(uploaded_file.getvalue())
@@ -349,10 +353,18 @@ def load_combined_model(uploaded_file):
         combined_data = joblib.load(tmp_path)
         os.unlink(tmp_path)
 
-        return combined_data
+        # raw_data가 포함되어 있는지 확인
+        raw_data = None
+        if 'raw_data' in combined_data:
+            raw_data = combined_data['raw_data']
+            print(f"[INFO] raw_data 추출됨: {raw_data.shape}")
+            # raw_data는 모델 데이터에서 제거 (메모리 효율)
+            del combined_data['raw_data']
+
+        return combined_data, raw_data
     except Exception as e:
         st.error(f"통합 모델 로드 실패: {e}")
-        return None
+        return None, None
 
 
 def detect_model_format(model_data):
@@ -969,7 +981,7 @@ elif menu == "모델 업로드":
 
         if uploaded_combined:
             with st.spinner("모델 파일 로드 중... (파일 크기가 클 수 있습니다)"):
-                combined_data = load_combined_model(uploaded_combined)
+                combined_data, embedded_raw_data = load_combined_model(uploaded_combined)
                 if combined_data:
                     # Predictor 생성
                     predictor = create_predictor_from_combined(combined_data)
@@ -983,6 +995,14 @@ elif menu == "모델 업로드":
                                 st.session_state.model_upload_status[model_name] = True
 
                         st.success(f"[OK] 모델 로드 완료! ({len(predictor.get_available_models())}개 모델)")
+
+                        # 내장된 raw_data가 있으면 자동 로드
+                        if embedded_raw_data is not None:
+                            if 'Date' in embedded_raw_data.columns:
+                                embedded_raw_data['Date'] = pd.to_datetime(embedded_raw_data['Date'])
+                            st.session_state.raw_data = embedded_raw_data
+                            st.success(f"[OK] 내장 데이터 자동 로드! ({len(embedded_raw_data):,}행)")
+
                         st.balloons()
 
                         # 로드된 모델 목록 표시
