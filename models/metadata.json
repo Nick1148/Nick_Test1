@@ -1,0 +1,168 @@
+{
+  "model_names": [
+    "integrated",
+    "ClassA",
+    "ClassB",
+    "ClassC"
+  ],
+  "target_columns": [
+    "BTX_generation",
+    "Heater_steam_input",
+    "BTXdistillator_distl_steam_input"
+  ],
+  "training_date": "2025-11-28 20:23:45",
+  "performances": {
+    "integrated": {
+      "BTX_generation": {
+        "R2": 1.0,
+        "RMSE": 0.0038,
+        "MAE": 0.0021,
+        "MAPE": 0.14,
+        "best_model": "ExtraTrees",
+        "model_comparison": {
+          "RandomForest": 0.9103666126508767,
+          "ExtraTrees": 0.966338612475785,
+          "GradientBoosting": 0.7500751889347663
+        }
+      },
+      "Heater_steam_input": {
+        "R2": 0.9996,
+        "RMSE": 0.0407,
+        "MAE": 0.0167,
+        "MAPE": 79871914094575.62,
+        "best_model": "RandomForest",
+        "model_comparison": {
+          "RandomForest": 0.7438213055088461,
+          "ExtraTrees": 0.6954253202850516,
+          "GradientBoosting": 0.7198146076290904
+        }
+      },
+      "BTXdistillator_distl_steam_input": {
+        "R2": 0.9998,
+        "RMSE": 0.0321,
+        "MAE": 0.0068,
+        "MAPE": 510867222244731.44,
+        "best_model": "RandomForest",
+        "model_comparison": {
+          "RandomForest": 0.8681686102990874,
+          "ExtraTrees": 0.8486776425605657,
+          "GradientBoosting": 0.7842187109978607
+        }
+      }
+    },
+    "ClassA": {
+      "BTX_generation": {
+        "R2": 0.0,
+        "RMSE": 0.0002,
+        "MAE": 0.0,
+        "MAPE": 2435885843045.15,
+        "best_model": "RandomForest",
+        "model_comparison": {
+          "RandomForest": 0.0,
+          "ExtraTrees": 0.0,
+          "GradientBoosting": 0.0
+        }
+      },
+      "Heater_steam_input": {
+        "R2": 0.9941,
+        "RMSE": 0.0097,
+        "MAE": 0.0057,
+        "MAPE": 33005366543816.79,
+        "best_model": "GradientBoosting",
+        "model_comparison": {
+          "RandomForest": -15.084431809255328,
+          "ExtraTrees": -1.6574602164578733,
+          "GradientBoosting": 0.06949214799685566
+        }
+      },
+      "BTXdistillator_distl_steam_input": {
+        "R2": 1.0,
+        "RMSE": 0.0002,
+        "MAE": 0.0,
+        "MAPE": 9090250490869.89,
+        "best_model": "ExtraTrees",
+        "model_comparison": {
+          "RandomForest": -435.6825130956447,
+          "ExtraTrees": -15.491668487559075,
+          "GradientBoosting": -418.890525219279
+        }
+      }
+    },
+    "ClassB": {
+      "BTX_generation": {
+        "R2": 0.9945,
+        "RMSE": 0.0202,
+        "MAE": 0.0107,
+        "MAPE": 37529996894754.97,
+        "best_model": "RandomForest",
+        "model_comparison": {
+          "RandomForest": 0.7376252814654597,
+          "ExtraTrees": 0.6823735812915027,
+          "GradientBoosting": 0.6349317146346873
+        }
+      },
+      "Heater_steam_input": {
+        "R2": 0.999,
+        "RMSE": 0.022,
+        "MAE": 0.0157,
+        "MAPE": 0.32,
+        "best_model": "ExtraTrees",
+        "model_comparison": {
+          "RandomForest": -1.018926144811934,
+          "ExtraTrees": -0.49944122913294353,
+          "GradientBoosting": -1.0746612308306283
+        }
+      },
+      "BTXdistillator_distl_steam_input": {
+        "R2": 0.9976,
+        "RMSE": 0.0133,
+        "MAE": 0.0103,
+        "MAPE": 0.25,
+        "best_model": "GradientBoosting",
+        "model_comparison": {
+          "RandomForest": -0.5520530181429675,
+          "ExtraTrees": -0.8996546864621946,
+          "GradientBoosting": -0.2539453150264237
+        }
+      }
+    },
+    "ClassC": {
+      "BTX_generation": {
+        "R2": 1.0,
+        "RMSE": 0.0001,
+        "MAE": 0.0001,
+        "MAPE": 0.0,
+        "best_model": "ExtraTrees",
+        "model_comparison": {
+          "RandomForest": 0.8717951993612455,
+          "ExtraTrees": 0.8785558357660374,
+          "GradientBoosting": 0.7877097557943489
+        }
+      },
+      "Heater_steam_input": {
+        "R2": 0.0,
+        "RMSE": 0.0,
+        "MAE": 0.0,
+        "MAPE": 0.0,
+        "best_model": "GradientBoosting",
+        "model_comparison": {
+          "RandomForest": -24.0,
+          "ExtraTrees": -5183.0,
+          "GradientBoosting": 0.0
+        }
+      },
+      "BTXdistillator_distl_steam_input": {
+        "R2": 1.0,
+        "RMSE": 0.0,
+        "MAE": 0.0,
+        "MAPE": 0.0,
+        "best_model": "ExtraTrees",
+        "model_comparison": {
+          "RandomForest": -6.38281385607038,
+          "ExtraTrees": -1.218732308418689,
+          "GradientBoosting": -6.235487328173275
+        }
+      }
+    }
+  }
+}
