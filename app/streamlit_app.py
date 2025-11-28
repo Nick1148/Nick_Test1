@@ -28,6 +28,45 @@ import joblib
 import tempfile
 import os
 
+# ============================================================
+# Hugging Face Hub 모델 다운로드 설정
+# ============================================================
+# 여기에 Hugging Face 저장소 ID를 입력하세요
+# 예: "your-username/4gtp-models"
+HF_REPO_ID = "nick1148/4gtp-models"  # 본인의 저장소로 변경하세요
+HF_MODEL_FILENAME = "models_combined.pkl"
+
+def download_model_from_huggingface():
+    """Hugging Face Hub에서 모델 다운로드"""
+    try:
+        from huggingface_hub import hf_hub_download
+
+        print(f"[HF] Downloading model from {HF_REPO_ID}...")
+
+        # 캐시 디렉토리에 다운로드 (재시작 시 재사용)
+        model_path = hf_hub_download(
+            repo_id=HF_REPO_ID,
+            filename=HF_MODEL_FILENAME,
+            cache_dir="/tmp/hf_cache"
+        )
+
+        print(f"[HF] Model downloaded to: {model_path}")
+        return model_path
+    except Exception as e:
+        print(f"[HF] Download failed: {e}")
+        return None
+
+def load_model_from_huggingface():
+    """Hugging Face에서 모델을 다운로드하고 로드"""
+    model_path = download_model_from_huggingface()
+    if model_path:
+        try:
+            combined_data = joblib.load(model_path)
+            return combined_data
+        except Exception as e:
+            print(f"[HF] Model load failed: {e}")
+    return None
+
 # 경로 설정
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
@@ -574,7 +613,26 @@ with st.sidebar:
                     st.warning(f"[--] {name}")
         else:
             st.warning("[!] 모델 미업로드")
-            st.caption("'모델 업로드' 메뉴에서 모델을 업로드하세요")
+            st.caption("'모델 업로드' 메뉴에서 업로드하거나")
+            st.caption("아래 버튼으로 자동 다운로드하세요")
+
+            # Hugging Face에서 모델 자동 다운로드 버튼
+            if st.button("🤗 HuggingFace에서 모델 다운로드", use_container_width=True):
+                with st.spinner("모델 다운로드 중... (약 1분 소요)"):
+                    combined_data = load_model_from_huggingface()
+                    if combined_data:
+                        predictor = create_predictor_from_combined(combined_data)
+                        if predictor:
+                            st.session_state.predictor = predictor
+                            st.session_state.models_loaded = True
+                            for model_name in predictor.get_available_models():
+                                st.session_state.model_upload_status[model_name] = True
+                            st.success("✅ 모델 다운로드 완료!")
+                            st.rerun()
+                        else:
+                            st.error("모델 로드 실패")
+                    else:
+                        st.error("다운로드 실패 - 저장소를 확인하세요")
 
     st.markdown("---")
 
