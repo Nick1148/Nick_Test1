@@ -32,9 +32,9 @@ import os
 # Hugging Face Hub 모델 다운로드 설정
 # ============================================================
 # 여기에 Hugging Face 저장소 ID를 입력하세요
-# 예: "your-username/4gtp-models"
 HF_REPO_ID = "nick1148/4gtp-models"  # 본인의 저장소로 변경하세요
-HF_MODEL_FILENAME = "models_combined.pkl"
+HF_MODEL_FILENAME = "model_integrated_compressed.pkl"  # 압축된 통합 모델 (95MB)
+HF_DATA_FILENAME = "4GTP_integrated_with_coal_Raw.xlsx"  # 데이터 파일
 
 def download_model_from_huggingface():
     """Hugging Face Hub에서 모델 다운로드"""
@@ -56,15 +56,47 @@ def download_model_from_huggingface():
         print(f"[HF] Download failed: {e}")
         return None
 
+def download_data_from_huggingface():
+    """Hugging Face Hub에서 데이터 파일 다운로드"""
+    try:
+        from huggingface_hub import hf_hub_download
+
+        print(f"[HF] Downloading data from {HF_REPO_ID}...")
+
+        data_path = hf_hub_download(
+            repo_id=HF_REPO_ID,
+            filename=HF_DATA_FILENAME,
+            cache_dir="/tmp/hf_cache"
+        )
+
+        print(f"[HF] Data downloaded to: {data_path}")
+        return data_path
+    except Exception as e:
+        print(f"[HF] Data download failed: {e}")
+        return None
+
 def load_model_from_huggingface():
     """Hugging Face에서 모델을 다운로드하고 로드"""
     model_path = download_model_from_huggingface()
     if model_path:
         try:
-            combined_data = joblib.load(model_path)
-            return combined_data
+            model_data = joblib.load(model_path)
+            return model_data
         except Exception as e:
             print(f"[HF] Model load failed: {e}")
+    return None
+
+def load_data_from_huggingface():
+    """Hugging Face에서 데이터를 다운로드하고 로드"""
+    data_path = download_data_from_huggingface()
+    if data_path:
+        try:
+            df = pd.read_excel(data_path)
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+            return df
+        except Exception as e:
+            print(f"[HF] Data load failed: {e}")
     return None
 
 # 경로 설정
@@ -323,20 +355,92 @@ def load_combined_model(uploaded_file):
         return None
 
 
-def create_predictor_from_combined(combined_data):
-    """통합 모델 데이터로 Predictor 생성"""
+def detect_model_format(model_data):
+    """
+    모델 파일 형식 감지
+
+    Returns:
+        'integrated': model_integrated.pkl 형식 (models 키 아래 직접 타겟별 모델)
+        'combined': models_combined.pkl 형식 (models 키 아래 모델명/타겟별 모델)
+        None: 알 수 없는 형식
+    """
+    if 'models' not in model_data:
+        return None
+
+    models = model_data['models']
+    if not models:
+        return None
+
+    # models의 첫 번째 키 확인
+    first_key = list(models.keys())[0]
+    first_value = models[first_key]
+
+    # combined 형식: models['integrated']['BTX_generation'] = sklearn model
+    # integrated 형식: models['BTX_generation'] = sklearn model
+
+    if isinstance(first_value, dict):
+        # combined 형식 (중첩된 딕셔너리)
+        return 'combined'
+    elif hasattr(first_value, 'predict'):
+        # integrated 형식 (직접 sklearn 모델)
+        return 'integrated'
+
+    return None
+
+
+def create_predictor_from_combined(model_data):
+    """
+    모델 데이터로 Predictor 생성
+
+    model_integrated.pkl과 models_combined.pkl 형식 모두 지원
+    """
     try:
         from src.prediction import MultiTargetPredictor
 
         predictor = MultiTargetPredictor()
-        predictor.models = combined_data.get('models', {})
-        predictor.model_performance = combined_data.get('performance', {})
-        predictor.feature_importance = combined_data.get('feature_importance', {})
+
+        # 모델 형식 감지
+        model_format = detect_model_format(model_data)
+        print(f"[INFO] Detected model format: {model_format}")
+
+        if model_format == 'integrated':
+            # model_integrated.pkl 형식
+            # models에 직접 타겟별 모델이 있음
+            # 이를 'integrated' 키 아래로 래핑
+            predictor.models = {'integrated': model_data.get('models', {})}
+
+            # performance와 feature_importance도 동일하게 래핑
+            perf = model_data.get('performance', {})
+            fi = model_data.get('feature_importance', {})
+
+            # 이미 타겟별로 정리되어 있는지 확인
+            if perf and list(perf.keys())[0] in TARGET_COLUMNS:
+                predictor.model_performance = {'integrated': perf}
+            else:
+                predictor.model_performance = perf
+
+            if fi and list(fi.keys())[0] in TARGET_COLUMNS:
+                predictor.feature_importance = {'integrated': fi}
+            else:
+                predictor.feature_importance = fi
+
+        elif model_format == 'combined':
+            # models_combined.pkl 형식
+            # 기존 방식 그대로
+            predictor.models = model_data.get('models', {})
+            predictor.model_performance = model_data.get('performance', {})
+            predictor.feature_importance = model_data.get('feature_importance', {})
+        else:
+            print("[ERROR] Unknown model format")
+            return None
+
         predictor.is_loaded = len(predictor.models) > 0
 
         return predictor if predictor.is_loaded else None
     except Exception as e:
         st.error(f"Predictor 생성 실패: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -644,9 +748,21 @@ with st.sidebar:
         # Cloud 환경에서는 데이터 업로드 옵션 표시
         st.warning("📤 데이터 업로드 필요")
 
+        # HuggingFace에서 데이터 다운로드 버튼
+        if st.button("🤗 HuggingFace에서 데이터 다운로드", use_container_width=True):
+            with st.spinner("데이터 다운로드 중..."):
+                df = load_data_from_huggingface()
+                if df is not None:
+                    st.session_state.raw_data = df
+                    st.session_state.data_loaded = True
+                    st.success("✅ 데이터 다운로드 완료!")
+                    st.rerun()
+                else:
+                    st.error("다운로드 실패 - 저장소를 확인하세요")
+
         # 데이터 파일 업로드
         uploaded_data = st.file_uploader(
-            "데이터 파일 업로드",
+            "또는 파일 직접 업로드",
             type=['xlsx', 'csv'],
             key="sidebar_data_upload",
             help="4GTP_integrated_with_coal_Raw.xlsx 파일을 업로드하세요"
@@ -813,15 +929,17 @@ elif menu == "모델 업로드":
 
     이 시스템은 **사전 학습된 모델 파일(.pkl)**을 업로드하여 사용합니다.
 
-    **통합 파일 (권장):**
-    - `models_combined.pkl` - 4개 모델이 모두 포함된 통합 파일
+    **지원 모델 파일:**
+    - `model_integrated_compressed.pkl` (95MB, 권장) - 압축된 통합 모델
+    - `model_integrated.pkl` (412MB) - 통합 모델 (비압축)
+    - `models_combined.pkl` (924MB) - 전체 4개 모델 포함 (Cloud 미권장)
 
-    > **Note:** 통합 파일 하나만 업로드하면 모든 모델(integrated, ClassA, ClassB, ClassC)을 사용할 수 있습니다.
+    > **Note:** Streamlit Cloud에서는 용량이 작은 `model_integrated_compressed.pkl`을 권장합니다.
+    > HuggingFace 자동 다운로드 기능으로 편리하게 모델을 로드할 수 있습니다.
 
     > **⚠️ Streamlit Cloud 주의:**
-    > - 파일 업로드 제한: 최대 1GB
-    > - 메모리 제한으로 인해 큰 파일 로드 시 시간이 걸릴 수 있습니다.
-    > - 업로드 중 연결이 끊기면 페이지를 새로고침 후 재시도하세요.
+    > - 메모리 제한: 약 1GB (큰 모델 사용 시 주의)
+    > - 권장: 압축 모델 또는 HuggingFace 자동 다운로드 사용
     """)
 
     st.markdown("---")
@@ -830,23 +948,23 @@ elif menu == "모델 업로드":
     tab1, tab2 = st.tabs(["[FILE] 파일 업로드", "[STATUS] 업로드 현황"])
 
     with tab1:
-        st.subheader("통합 모델 파일 업로드")
+        st.subheader("모델 파일 업로드")
 
         st.markdown("""
-        **models_combined.pkl** 파일을 업로드하세요.
+        **지원 파일 형식:**
+        - `model_integrated_compressed.pkl` (95MB, 권장)
+        - `model_integrated.pkl` (412MB)
+        - `models_combined.pkl` (924MB)
 
-        이 파일에는 다음 모델들이 포함되어 있습니다:
-        - 통합 모델 (Integrated) - 전체 데이터 학습
-        - ClassA 모델 - ClassA 석탄 전용
-        - ClassB 모델 - ClassB 석탄 전용
-        - ClassC 모델 - ClassC 석탄 전용
+        **통합 모델(Integrated)**은 전체 데이터로 학습된 범용 모델입니다.
+        Coal Class 선택은 데이터 분석용으로 계속 제공됩니다.
         """)
 
         uploaded_combined = st.file_uploader(
-            "models_combined.pkl 업로드",
+            "모델 파일 (.pkl) 업로드",
             type=['pkl'],
             key="upload_combined",
-            help="4개 모델이 통합된 파일 - 업로드에 시간이 걸릴 수 있습니다"
+            help="model_integrated.pkl, model_integrated_compressed.pkl, 또는 models_combined.pkl"
         )
 
         if uploaded_combined:
@@ -899,22 +1017,37 @@ elif menu == "모델 업로드":
                         st.error("[ERROR] models/ 폴더에 모델 파일이 없습니다.")
 
         with col2:
-            if st.button("[LOAD] 통합 파일 로드", use_container_width=True, help="models_combined.pkl 로드"):
-                combined_path = MODELS_DIR / 'models_combined.pkl'
-                if combined_path.exists():
-                    with st.spinner("통합 모델 로드 중..."):
-                        combined_data = joblib.load(combined_path)
-                        predictor = create_predictor_from_combined(combined_data)
-                        if predictor:
-                            st.session_state.predictor = predictor
-                            st.session_state.models_loaded = True
-                            for model_name in predictor.get_available_models():
-                                if model_name in st.session_state.model_upload_status:
-                                    st.session_state.model_upload_status[model_name] = True
-                            st.success("[OK] 통합 모델 로드 완료!")
-                            st.rerun()
-                else:
-                    st.error("[ERROR] models/models_combined.pkl 파일이 없습니다.")
+            if st.button("[LOAD] 통합 파일 로드", use_container_width=True, help="model_integrated.pkl 또는 models_combined.pkl 로드"):
+                # 우선순위: 압축 통합 -> 통합 -> 전체 통합
+                possible_paths = [
+                    MODELS_DIR / 'model_integrated_compressed.pkl',
+                    MODELS_DIR / 'model_integrated.pkl',
+                    MODELS_DIR / 'models_combined.pkl'
+                ]
+
+                loaded = False
+                for model_path in possible_paths:
+                    if model_path.exists():
+                        with st.spinner(f"{model_path.name} 로드 중..."):
+                            try:
+                                model_data = joblib.load(model_path)
+                                predictor = create_predictor_from_combined(model_data)
+                                if predictor:
+                                    st.session_state.predictor = predictor
+                                    st.session_state.models_loaded = True
+                                    for model_name in predictor.get_available_models():
+                                        if model_name in st.session_state.model_upload_status:
+                                            st.session_state.model_upload_status[model_name] = True
+                                    st.success(f"[OK] {model_path.name} 로드 완료!")
+                                    loaded = True
+                                    st.rerun()
+                                    break
+                            except Exception as e:
+                                st.warning(f"{model_path.name} 로드 실패: {e}")
+                                continue
+
+                if not loaded:
+                    st.error("[ERROR] models/ 폴더에 모델 파일이 없습니다.")
 
     with tab2:
         st.subheader("업로드 현황")
