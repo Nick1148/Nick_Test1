@@ -54,6 +54,10 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+~$*
+
+# Local settings
+.claude/
 
 # Windows special files
 nul

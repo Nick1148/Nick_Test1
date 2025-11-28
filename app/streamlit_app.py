@@ -194,8 +194,31 @@ if 'model_upload_status' not in st.session_state:
 def load_raw_data():
     """원시 데이터 로드"""
     try:
-        df = pd.read_excel(DATA_FILE)
-        df['Date'] = pd.to_datetime(df['Date'])
+        # 로컬 파일이 있는지 확인
+        if DATA_FILE.exists():
+            df = pd.read_excel(DATA_FILE)
+            df['Date'] = pd.to_datetime(df['Date'])
+            return df
+        else:
+            # Streamlit Cloud에서는 파일이 없을 수 있음
+            return None
+    except Exception as e:
+        # 오류를 조용히 처리 (Cloud 환경)
+        return None
+
+
+def load_uploaded_data(uploaded_file):
+    """업로드된 데이터 파일 로드"""
+    try:
+        if uploaded_file.name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file)
+        elif uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        else:
+            return None
+
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
         return df
     except Exception as e:
         st.error(f"데이터 로드 실패: {e}")
@@ -537,14 +560,36 @@ with st.sidebar:
     if st.session_state.raw_data is not None:
         st.success(f"✅ {len(st.session_state.raw_data):,}행 로드됨")
     else:
-        if st.button("🔄 데이터 로드", use_container_width=True):
+        # Cloud 환경에서는 데이터 업로드 옵션 표시
+        st.warning("📤 데이터 업로드 필요")
+
+        # 데이터 파일 업로드
+        uploaded_data = st.file_uploader(
+            "데이터 파일 업로드",
+            type=['xlsx', 'csv'],
+            key="sidebar_data_upload",
+            help="4GTP_integrated_with_coal_Raw.xlsx 파일을 업로드하세요"
+        )
+
+        if uploaded_data:
             with st.spinner("데이터 로드 중..."):
-                df = load_raw_data()
+                df = load_uploaded_data(uploaded_data)
                 if df is not None:
                     st.session_state.raw_data = df
                     st.session_state.data_loaded = True
                     st.success("✅ 데이터 로드 완료!")
                     st.rerun()
+
+        # 로컬 파일 로드 버튼 (로컬 환경용)
+        if DATA_FILE.exists():
+            if st.button("🔄 로컬 데이터 로드", use_container_width=True):
+                with st.spinner("데이터 로드 중..."):
+                    df = load_raw_data()
+                    if df is not None:
+                        st.session_state.raw_data = df
+                        st.session_state.data_loaded = True
+                        st.success("✅ 데이터 로드 완료!")
+                        st.rerun()
 
     st.markdown("---")
     st.caption("© 2025 4GTP 예측 시스템")
@@ -554,8 +599,8 @@ with st.sidebar:
 # 메인 컨텐츠
 # ============================================================
 
-# 데이터 자동 로드
-if st.session_state.raw_data is None:
+# 데이터 자동 로드 (로컬 환경에서만)
+if st.session_state.raw_data is None and DATA_FILE.exists():
     df = load_raw_data()
     if df is not None:
         st.session_state.raw_data = df
@@ -690,6 +735,11 @@ elif menu == "모델 업로드":
     - `models_combined.pkl` - 4개 모델이 모두 포함된 통합 파일
 
     > **Note:** 통합 파일 하나만 업로드하면 모든 모델(integrated, ClassA, ClassB, ClassC)을 사용할 수 있습니다.
+
+    > **⚠️ Streamlit Cloud 주의:**
+    > - 파일 업로드 제한: 최대 1GB
+    > - 메모리 제한으로 인해 큰 파일 로드 시 시간이 걸릴 수 있습니다.
+    > - 업로드 중 연결이 끊기면 페이지를 새로고침 후 재시도하세요.
     """)
 
     st.markdown("---")
@@ -714,7 +764,7 @@ elif menu == "모델 업로드":
             "models_combined.pkl 업로드",
             type=['pkl'],
             key="upload_combined",
-            help="4개 모델이 통합된 파일 (약 924MB)"
+            help="4개 모델이 통합된 파일 - 업로드에 시간이 걸릴 수 있습니다"
         )
 
         if uploaded_combined:
