@@ -11,7 +11,10 @@ Module 3: Streamlit 웹 애플리케이션
 - 예측 결과 다운로드
 """
 
+print("[STARTUP] Starting Streamlit app...")
+
 import streamlit as st
+print("[STARTUP] Streamlit imported")
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -30,11 +33,13 @@ APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 sys.path.append(str(ROOT_DIR))
 
+print("[STARTUP] Importing config.settings...")
 from config.settings import (
     TARGET_COLUMNS, TARGET_NAMES_KR, TARGET_UNITS,
     COAL_CLASSES, FEATURE_GROUPS, FEATURE_NAMES_KR,
     UI_SETTINGS, CHART_COLORS, DATA_FILE, MODELS_DIR
 )
+print("[STARTUP] Config imported successfully")
 
 
 # ============================================================
@@ -530,9 +535,11 @@ def create_distribution_chart(df, column, title=None):
 # ============================================================
 # 사이드바
 # ============================================================
+print("[STARTUP] Setting up sidebar...")
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/factory.png", width=80)
-    st.title("🏭 4GTP 예측 시스템")
+    # 외부 이미지 URL 제거 (Cloud 환경에서 블로킹 방지)
+    st.markdown("# 🏭")
+    st.title("4GTP 예측 시스템")
     st.markdown("---")
 
     # 메뉴 선택 (모델 업로드가 첫 번째)
@@ -610,6 +617,7 @@ with st.sidebar:
     st.markdown("---")
     st.caption("© 2025 4GTP 예측 시스템")
 
+print("[STARTUP] Sidebar setup complete")
 
 # ============================================================
 # 메인 컨텐츠
@@ -1758,3 +1766,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+print("[STARTUP] App initialization complete!")
