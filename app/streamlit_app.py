@@ -1139,15 +1139,12 @@ elif menu == "모델 업로드":
 elif menu == "데이터 분석":
     st.markdown('<div class="main-header">📊 데이터 분석</div>', unsafe_allow_html=True)
 
-    # 모델 미업로드시 경고
-    if not st.session_state.models_loaded:
-        st.warning("⚠️ 모델이 업로드되지 않았습니다. '모델 업로드' 메뉴에서 모델을 먼저 업로드해주세요.")
-        st.stop()
-
+    # 데이터 분석은 모델 없이도 가능 - 데이터만 필요
     df = st.session_state.raw_data
 
     if df is None:
         st.warning("⚠️ 데이터를 먼저 로드해주세요.")
+        st.info("💡 사이드바에서 'HuggingFace에서 데이터 다운로드' 또는 파일을 직접 업로드하세요.")
     else:
         # 탭 구성
         tab1, tab2, tab3, tab4 = st.tabs(["📋 데이터 개요", "📈 통계 분석", "🔗 상관관계", "📊 분포 분석"])
@@ -1305,6 +1302,13 @@ elif menu == "예측 실행":
     predictor = st.session_state.predictor
     df = st.session_state.raw_data
 
+    # 데이터 없을 때 경고
+    if df is None:
+        st.warning("⚠️ 데이터가 로드되지 않았습니다.")
+        st.info("💡 최적값 계산을 위해 데이터가 필요합니다. 사이드바에서 'HuggingFace에서 데이터 다운로드'를 클릭하세요.")
+        st.markdown("---")
+        st.markdown("**데이터 없이도 현재값 입력은 가능하지만, 최적값 비교 기능은 제한됩니다.**")
+
     # 상위 5개 주요 인자 정의 (Feature Importance 기반)
     TOP_5_FEATURES = [
         'BS_aoil_flow',       # 흡수유 유량
@@ -1319,7 +1323,17 @@ elif menu == "예측 실행":
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         defaults = df[numeric_cols].iloc[-100:].mean()
     else:
-        defaults = {}
+        # 데이터 없을 때 기본값 설정
+        defaults = {
+            'BTX_generation': 1.5,
+            'Heater_steam_input': 6.0,
+            'BTXdistillator_distl_steam_input': 4.0,
+            'BS_aoil_flow': 100.0,
+            'BS_out_COG_F': 50.0,
+            'BTXdistillator_RO_flow': 30.0,
+            'Heater_temp': 180.0,
+            'HE_VO_RO_T': 120.0
+        }
 
     st.markdown("""
     ### 📋 예측 목적
@@ -1342,6 +1356,7 @@ elif menu == "예측 실행":
     )
 
     # 해당 Coal Class의 최적값 계산 (상위 10% 효율)
+    optimal_available = False  # 최적값 계산 가능 여부
     if df is not None and 'coal_class' in df.columns:
         class_df = df[df['coal_class'] == coal_class].copy()
         if len(class_df) > 10:
@@ -1356,12 +1371,14 @@ elif menu == "예측 실행":
                 'Heater_steam_input': top_10_pct['Heater_steam_input'].mean(),
                 'BTXdistillator_distl_steam_input': top_10_pct['BTXdistillator_distl_steam_input'].mean()
             }
+            optimal_available = True
             st.success(f"📊 {coal_class} 상위 10% 효율 데이터 ({len(top_10_pct)}개) 기반 최적값 계산 완료")
         else:
             optimal_from_data = defaults.to_dict() if hasattr(defaults, 'to_dict') else dict(defaults)
-            st.warning(f"⚠️ {coal_class} 데이터가 부족하여 전체 평균을 사용합니다.")
+            st.warning(f"⚠️ {coal_class} 데이터가 부족하여 기본값을 사용합니다.")
     else:
         optimal_from_data = defaults.to_dict() if hasattr(defaults, 'to_dict') else dict(defaults)
+        st.info("ℹ️ 데이터가 없어 최적값을 계산할 수 없습니다. 기본값을 표시합니다.")
 
     st.markdown("---")
 
@@ -1418,7 +1435,10 @@ elif menu == "예측 실행":
 
     # 2. 최적값 표시 (데이터 기반)
     st.markdown("### 🎯 최적 운전값 (데이터 기반)")
-    st.caption(f"{coal_class} 상위 10% 효율 데이터에서 추출한 최적값입니다.")
+    if optimal_available:
+        st.caption(f"{coal_class} 상위 10% 효율 데이터에서 추출한 최적값입니다.")
+    else:
+        st.caption("⚠️ 데이터가 없어 기본값을 표시합니다. 정확한 최적값 비교를 위해 데이터를 로드하세요.")
 
     optimal_cols = st.columns(3)
     with optimal_cols[0]:
